@@ -28,6 +28,14 @@ provider:
             - "logs:CreateLogStream"
             - "logs:PutLogEvents"
           Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}*"
+        - Effect: "Allow"
+          Action:
+            - "events:DescribeRule"
+            - "events:PutRule"
+            - "events:DeleteRule"
+            - "events:PutTargets"
+            - "events:RemoveTargets"
+          Resource: "arn:aws:events:${self:provider.region}:${aws:accountId}:rule/${self:service}-${self:provider.stage}*"
 
 functions:
   generatePriceSheet:
@@ -81,12 +89,8 @@ package:
     - .git/**
     - .serverless/**
     - .vscode/**
-    - .venv/**              
-    - **/*.md              
-    - .DS_Store            
-    - **/__pycache__/**    
-    - **/tests/**          
-    - **/*.log             
+    - .venv/**                          
+    - .DS_Store                       
 
 plugins:
   - serverless-dynamodb-local
