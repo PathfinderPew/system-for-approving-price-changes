@@ -1,0 +1,132 @@
+service: pricing-approval-system
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: dev
+  profile: local  # Use the "local" profile for AWS credentials
+  deploymentBucket:
+    name: serverless-framework-deployments-us-east-1-dcce5bce-ae8b  # Specify your S3 bucket for deployments
+  environment:
+    DYNAMODB_TABLE: ${self:custom.tableName}
+
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - "dynamodb:PutItem"
+            - "dynamodb:UpdateItem"
+            - "dynamodb:GetItem"
+            - "dynamodb:Scan"
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.tableName}"
+        - Effect: "Allow"
+          Action:
+            - "logs:CreateLogGroup"
+            - "logs:CreateLogStream"
+            - "logs:PutLogEvents"
+          Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}*"
+
+functions:
+  generatePriceSheet:
+    handler: lambda_functions.generate_price_sheet.lambda_handler
+    events:
+      - http:
+          path: generate-price-sheet
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+
+  approvalHandler:
+    handler: lambda_functions.approval_handler.lambda_handler
+    events:
+      - http:
+          path: approval
+          method: post
+          cors: true
+
+  emailNotifier:
+    handler: lambda_functions.email_notifier.lambda_handler
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt:
+              - PricingProposals
+              - StreamArn
+          startingPosition: LATEST
+          batchSize: 1
+          enabled: true
+
+  applyApprovedChanges:
+    handler: lambda_functions.apply_approved_changes.lambda_handler
+    events:
+      - schedule:
+          rate: rate(1 day)
+
+package:
+  individually: true  # Package each function separately to reduce total size
+  include:
+    - lambda_functions/**
+  exclude:
+    - node_modules/**
+    - .git/**
+    - .serverless/**
+    - .vscode/**
+    - .venv/**              
+    - **/*.md              
+    - .DS_Store            
+    - **/__pycache__/**    
+    - **/tests/**          
+    - **/*.log             
+
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+
+custom:
+  tableName: PricingProposals
+  dynamodb:
+    stages: ["dev"]
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+      seed: true
+      heapInitial: '200m'
+      heapMax: '1g'
+      javaOpts: '-Djava.library.path=./.dynamodb'
+    installPath: './.dynamodb'
+    seed:
+      sources:
+        - table: ${self:custom.tableName}
+          sources:
+            - path: ./seed-data/pricing-proposals.json
+
+resources:
+  Resources:
+    PricingProposals:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        AttributeDefinitions:
+          - AttributeName: ProductID
+            AttributeType: S
+          - AttributeName: VariantID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ProductID
+            KeyType: HASH
+          - AttributeName: VariantID
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
