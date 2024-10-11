@@ -10,6 +10,9 @@ provider:
     name: serverless-framework-deployments-us-east-1-dcce5bce-ae8b  # Specify your S3 bucket for deployments
   environment:
     DYNAMODB_TABLE: ${self:custom.tableName}
+    MINIMUM_PRICE_TABLE: ${self:custom.minPriceTableName}
+    SES_SENDER_EMAIL: "no-reply@yourdomain.com"
+    APPROVAL_EMAIL_LIST: "manager@example.com,manager2@example.com"
 
   iam:
     role:
@@ -22,6 +25,7 @@ provider:
             - "dynamodb:Scan"
           Resource:
             - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.tableName}"
+            - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.minPriceTableName}"
         - Effect: "Allow"
           Action:
             - "logs:CreateLogGroup"
@@ -36,6 +40,10 @@ provider:
             - "events:PutTargets"
             - "events:RemoveTargets"
           Resource: "arn:aws:events:${self:provider.region}:${aws:accountId}:rule/${self:service}-${self:provider.stage}*"
+        - Effect: "Allow"
+          Action:
+            - "ses:SendEmail"
+          Resource: "*"
 
 functions:
   generatePriceSheet:
@@ -98,6 +106,7 @@ plugins:
 
 custom:
   tableName: PricingProposals
+  minPriceTableName: MinimumPrices  # Added the minimum price table
   dynamodb:
     stages: ["dev"]
     start:
@@ -114,6 +123,9 @@ custom:
         - table: ${self:custom.tableName}
           sources:
             - path: ./seed-data/pricing-proposals.json
+        - table: ${self:custom.minPriceTableName}  # Seed minimum price table
+          sources:
+            - path: ./seed-data/minimum-prices.json
 
 resources:
   Resources:
@@ -134,3 +146,15 @@ resources:
         BillingMode: PAY_PER_REQUEST
         StreamSpecification:
           StreamViewType: NEW_AND_OLD_IMAGES
+
+    MinimumPrices:
+      Type: AWS::DynamoDB::Table  # New table for storing minimum prices
+      Properties:
+        TableName: ${self:custom.minPriceTableName}
+        AttributeDefinitions:
+          - AttributeName: ProductID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ProductID
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
