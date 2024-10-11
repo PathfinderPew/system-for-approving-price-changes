@@ -8,6 +8,7 @@ ses = boto3.client('ses', region_name='us-east-1')
 # Get environment variables
 SENDER_EMAIL = os.getenv('SES_SENDER_EMAIL', 'no-reply@yourdomain.com')
 APPROVAL_EMAIL_LIST = os.getenv('APPROVAL_EMAIL_LIST', 'manager@example.com,manager2@example.com')
+WEB_PAGE_URL = os.getenv('WEB_PAGE_URL', 'https://your-approval-page.com')
 
 def lambda_handler(event, context):
     """
@@ -49,7 +50,7 @@ def send_proposal_notification(new_image):
         f"Competitor Price: {competitor_price}\n"
         f"Proposed Price: {proposed_price}\n"
         f"Approval Status: {approval_status}\n"
-        f"Please review the proposal in the Pricing Approval Dashboard."
+        f"Please review the proposal in the Pricing Approval Dashboard: {WEB_PAGE_URL}"
     )
 
     # Send the email
@@ -73,7 +74,7 @@ def send_approval_status_notification(new_image):
         f"Proposed Price: {proposed_price}\n"
         f"Reviewed By: {reviewed_by}\n"
         f"Approval Status: {approval_status}\n"
-        f"Please review the status in the Pricing Approval Dashboard."
+        f"Please review the status in the Pricing Approval Dashboard: {WEB_PAGE_URL}"
     )
 
     # Send the email
