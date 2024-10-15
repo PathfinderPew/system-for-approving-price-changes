@@ -88,6 +88,23 @@ functions:
       - schedule:
           rate: rate(1 day)
 
+  # Add API endpoints for approving/rejecting price changes
+  approvePrice:
+    handler: lambda_functions.approve_price.lambda_handler
+    events:
+      - http:
+          path: approve/{id}
+          method: post
+          cors: true
+
+  rejectPrice:
+    handler: lambda_functions.reject_price.lambda_handler
+    events:
+      - http:
+          path: reject/{id}
+          method: post
+          cors: true
+
 package:
   individually: true  # Package each function separately to reduce total size
   include:
